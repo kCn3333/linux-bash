@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # config files 
-NTFY_CONFIG_FILE="/home/kcn/script/ntfy.config"
-ALLOWED_IP_CONFIG_FILE="/home/kcn/script/allowed_ip.config"
+NTFY_CONFIG_FILE="/home/kcn/script/ntfy.config"                 # change to your path
+ALLOWED_IP_CONFIG_FILE="/home/kcn/script/allowed_ip.config"     # change to your path
 
 
 source "$NTFY_CONFIG_FILE"
