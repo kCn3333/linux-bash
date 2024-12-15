@@ -20,8 +20,7 @@ NTFY_URL="https://ntfy.domain.com"
 ```
 **`allowed_ip.config`**: Contains a list of allowed IP addresses for SSH logins.
 ```
-192.168.0.5
-192.168.1.100
+ALLOWED_IP="192.168.3.33"
 ```
 
 ## Setting Up as a Systemd Service
