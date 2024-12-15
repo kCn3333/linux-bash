@@ -1,0 +1,5 @@
+nohup vlc rtsp://admin:69DupaDupa@192.168.0.64:554/Streaming/Channels/101 --intf dummy --quiet > /dev/null 2>&1 &
+
+
+
+mpv rtsp://admin:69DupaDupa@192.168.0.64:554/Streaming/Channels/101

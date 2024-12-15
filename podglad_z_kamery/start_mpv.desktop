@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=MPV Stream
+Comment=Stream MPV
+Exec=/script/podglad_z_kamery/start_mpv.sh
+Icon=media-player
+Terminal=true
+Type=Application
+Categories=AudioVideo;
