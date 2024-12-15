@@ -1,5 +1,3 @@
-~/.bashrc
-
 # SSH Login Attempt Monitoring and Notification
 
 This script is designed to monitor failed and successful SSH login attempts on your server and notify you of any login attempts from unauthorized IPs. It sends notifications via **ntfy** when an SSH login is attempted from an IP address that is not on your allowed list.
@@ -39,7 +37,7 @@ Description=Monitor SSH login attempts
 After=network.target
 
 [Service]
-ExecStart=/path/to/ssh_monitor.sh
+ExecStart=/path/to/ssh_login.sh
 Restart=always
 User=your-username
 
