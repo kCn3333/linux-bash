@@ -1,3 +1,5 @@
 hikvision/
 cam1/
 podglad_z_kamery/
+ntfy.config
+allowed_ip.config
