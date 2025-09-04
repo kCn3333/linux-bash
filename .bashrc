@@ -157,7 +157,7 @@ sudo() {
 #eval "$(fzf --bash)"
 
 #============================================================================================
-# 🔍 Pobranie informacji systemowych
+# 🔍 system info
 UPTIME=$(uptime -p)
 CPU_LOAD=$(awk -v cores=$(nproc) '{printf "%.1f%%", ($1 / cores) * 100}' /proc/loadavg)
 MEMORY_TOTAL_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
@@ -175,12 +175,12 @@ LAST_UPDATE=$(grep -i "start-date" /var/log/apt/history.log* | tail -n 1 | awk '
 USER_NAME=$(whoami | tr 'a-z' 'A-Z')
 
 
-# 🔥 Sprawdzenie, czy sensors zwraca temperaturę CPU
+# 🔥 Check CPU temp sensor
 if [ -z "$CPU_TEMP" ]; then
     CPU_TEMP="Brak danych"
 fi
 
-# 🌐 Pobranie adresu IP
+# 🌐 Get IP address
 IP_ADDR=$(hostname -I | awk '{print $1}')
 
 # 🚀 ASCII Banner
@@ -197,7 +197,7 @@ echo -e "${CYAN}"
 echo -e "      Witaj na serwerze: ${GREEN}[ $USER_NAME ]${CYAN}"
 echo -e "${RESET}"
 
-# 📊 Wyświetlenie informacji systemowych
+# 📊 Show system info
 echo -e "         ${LBLUE}📅 Uptime:        ${LGREEN}$UPTIME${RESET}"
 echo -e "         ${LBLUE}🔄 Update:        ${LGREEN}${LAST_UPDATE:-Brak danych}${RESET}"
 echo -e "         ${LBLUE}🚀 CPU:           ${LGREEN}$CPU_LOAD% ( ${CPU_TEMP})${RESET}"
