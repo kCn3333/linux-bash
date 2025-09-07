@@ -51,7 +51,7 @@ trap 'echo -e "'$RED'[$TIMESTAMP] $ICON_ERROR Error on line $LINENO'$RESET'"' ER
 echo -e "[$TIMESTAMP] ${GREEN}$ICON_START Backup started...$RESET"
 
 # ------------------------
-# MongoDB Backup
+# MongoDB Backup 
 # ------------------------
 while read -r i; do
     [ -z "$i" ] && continue
@@ -64,15 +64,29 @@ while read -r i; do
 
     FILE="$BACKUPDIR/$i-mongodb-$MONGO_DB-$TIMESTAMP.archive.gz"
 
-    docker exec "$i" mongodump \
-        --username "$MONGO_USER" \
-        --password "$MONGO_PASS" \
-        --authenticationDatabase admin \
-        --db "$MONGO_DB" \
-        --archive | gzip > "$FILE"
+    # 1️⃣ Dump from container
+    if docker exec "$i" which mongodump >/dev/null 2>&1; then
+        docker exec "$i" mongodump \
+            --username "$MONGO_USER" \
+            --password "$MONGO_PASS" \
+            --authenticationDatabase admin \
+            --db "$MONGO_DB" \
+            --archive | gzip > "$FILE"
+        echo "[$TIMESTAMP] $FILE — dumped from container"
 
-    echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
+    # 2️⃣ Fallback host TCP (port 27017)
+    elif docker inspect -f '{{ (index .NetworkSettings.Ports "27017/tcp") }}' "$i" >/dev/null 2>&1; then
+        MONGO_PORT=$(docker inspect -f '{{ (index .NetworkSettings.Ports "27017/tcp") }}' "$i" 2>/dev/null | grep -oP '[0-9]+')
+        MONGO_HOST="127.0.0.1"
+        echo "[$TIMESTAMP] mongodump not found in container, using host TCP connection"
+        mongodump -h "$MONGO_HOST" -P "$MONGO_PORT" -u "$MONGO_USER" -p "$MONGO_PASS" --authenticationDatabase admin --db "$MONGO_DB" --archive | gzip > "$FILE"
+    else
+        echo "[$TIMESTAMP] ❌ Cannot backup $i/$MONGO_DB: mongodump not found, no host TCP port"
+    fi
+
+    [ -f "$FILE" ] && echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
 done < <(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mongo' | cut -d":" -f1 || true)
+
 
 # ------------------------
 # MySQL/MariaDB Backup (host fallback, excluding Nextcloud)
@@ -100,9 +114,12 @@ for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mariadb|mysql' 
 
     FILE="$BACKUPDIR/$i-mysql-$MYSQL_DB-$TIMESTAMP.sql.gz"
 
+    # 1️⃣ Dump from container
     if docker exec "$i" which mysqldump >/dev/null 2>&1; then
         docker exec "$i" mysqldump -u "$MYSQL_USER" -p"$MYSQL_PWD" "$MYSQL_DB" | gzip > "$FILE"
         echo "[$TIMESTAMP] $FILE — dumped from container"
+
+    # 2️⃣ Fallback host TCP (port 3306)
     elif [ -n "$MYSQL_PORT" ]; then
         echo "[$TIMESTAMP] mysqldump not found in container, using host TCP connection"
         mysqldump -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" -p"$MYSQL_PWD" "$MYSQL_DB" | gzip > "$FILE"
@@ -114,7 +131,7 @@ for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mariadb|mysql' 
 done
 
 # ------------------------
-# PostgreSQL Backup 
+# PostgreSQL Backup
 # ------------------------
 for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep 'postgres' | cut -d":" -f1); do
     [ -z "$i" ] && continue
@@ -126,14 +143,23 @@ for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep 'postgres' | cut -d
 
     FILE="$BACKUPDIR/$i-postgresql-$PG_DB-$TIMESTAMP.sql.gz"
 
-    # 
+    # 1️⃣ Backup from contatiner
     if docker exec "$i" which pg_dump >/dev/null 2>&1; then
         docker exec -e PGPASSWORD="$PG_PASS" "$i" pg_dump -U "$PG_USER" -d "$PG_DB" -Fc | gzip > "$FILE"
         echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
+
+    # 2️⃣ Fallback host TCP (port 5432)
+    elif docker inspect -f '{{ (index .NetworkSettings.Ports "5432/tcp") }}' "$i" >/dev/null 2>&1; then
+        PG_PORT=$(docker inspect -f '{{ (index .NetworkSettings.Ports "5432/tcp") }}' "$i" 2>/dev/null | grep -oP '[0-9]+')
+        PG_HOST="127.0.0.1"
+        echo "[$TIMESTAMP] pg_dump not found in container, using host TCP connection"
+        PGPASSWORD="$PG_PASS" pg_dump -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -Fc | gzip > "$FILE"
+
     else
-        echo "[$TIMESTAMP] ❌ Cannot backup $i/$PG_DB: pg_dump not found in container"
+        echo "[$TIMESTAMP] ❌ Cannot backup $i/$PG_DB: pg_dump not found and no host TCP port"
     fi
 done
+
 
 # ------------------------
 # SQLite Backup (host paths or container)
