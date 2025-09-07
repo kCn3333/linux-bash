@@ -75,9 +75,9 @@ while read -r i; do
 done < <(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mongo' | cut -d":" -f1 || true)
 
 # ------------------------
-# MySQL/MariaDB Backup
+# MySQL/MariaDB Backup (host fallback)
 # ------------------------
-while read -r i; do
+for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mariadb|mysql' | cut -d":" -f1); do
     [ -z "$i" ] && continue
     DB_COUNT=$((DB_COUNT+1))
 
@@ -85,16 +85,31 @@ while read -r i; do
     MYSQL_DB=$(docker exec "$i" env | grep MYSQL_DATABASE | cut -d"=" -f2)
     MYSQL_PWD=$(docker exec "$i" env | grep MYSQL_PASSWORD | cut -d"=" -f2)
 
+    MYSQL_USER=${MYSQL_USER:-root}
+    MYSQL_DB=${MYSQL_DB:-"$MYSQL_USER"}
+
+    MYSQL_PORT=$(docker inspect -f '{{ (index .NetworkSettings.Ports "3306/tcp") }}' "$i" 2>/dev/null | grep -oP '[0-9]+')
+    MYSQL_HOST="127.0.0.1"
+
     FILE="$BACKUPDIR/$i-mysql-$MYSQL_DB-$TIMESTAMP.sql.gz"
 
-    docker exec -e MYSQL_PWD="$MYSQL_PWD" "$i" mysqldump -u "$MYSQL_USER" "$MYSQL_DB" | gzip > "$FILE"
-    echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
-done < <(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mariadb|mysql' | cut -d":" -f1)
+    if docker exec "$i" which mysqldump >/dev/null 2>&1; then
+        docker exec "$i" mysqldump -u "$MYSQL_USER" -p"$MYSQL_PWD" "$MYSQL_DB" | gzip > "$FILE"
+        echo "[$TIMESTAMP] $FILE — dumped from container"
+    elif [ -n "$MYSQL_PORT" ]; then
+        echo "[$TIMESTAMP] mysqldump not found in container, using host TCP connection"
+        mysqldump -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" -p"$MYSQL_PWD" "$MYSQL_DB" | gzip > "$FILE"
+    else
+        echo "[$TIMESTAMP] ❌ Cannot backup $i/$MYSQL_DB: no mysqldump in container and no host TCP port"
+    fi
+
+    [ -f "$FILE" ] && echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
+done
 
 # ------------------------
-# PostgreSQL Backup
+# PostgreSQL Backup 
 # ------------------------
-while read -r i; do
+for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep 'postgres' | cut -d":" -f1); do
     [ -z "$i" ] && continue
     DB_COUNT=$((DB_COUNT+1))
 
@@ -102,42 +117,59 @@ while read -r i; do
     PG_DB=$(docker exec "$i" env | grep POSTGRES_DB | cut -d"=" -f2)
     PG_PASS=$(docker exec "$i" env | grep POSTGRES_PASSWORD | cut -d"=" -f2)
 
-    export PGPASSWORD="$PG_PASS"
-
     FILE="$BACKUPDIR/$i-postgresql-$PG_DB-$TIMESTAMP.sql.gz"
 
-    docker exec "$i" pg_dump -U "$PG_USER" "$PG_DB" | gzip > "$FILE"
-    unset PGPASSWORD
-    echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
-done < <(docker ps --format '{{.Names}}:{{.Image}}' | grep 'postgres' | cut -d":" -f1)
+    # 
+    if docker exec "$i" which pg_dump >/dev/null 2>&1; then
+        docker exec -e PGPASSWORD="$PG_PASS" "$i" pg_dump -U "$PG_USER" -d "$PG_DB" | gzip > "$FILE"
+        echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
+    else
+        echo "[$TIMESTAMP] ❌ Cannot backup $i/$PG_DB: pg_dump not found in container"
+    fi
+done
 
 # ------------------------
-# Vaultwarden SQLite Backup
+# SQLite Backup (host paths or container)
 # ------------------------
-while read -r i; do
-    [ -z "$i" ] && continue
+DOCKER_PATH="/home/$CURRENT_USER/docker/"
+
+# --- Vaultwarden ---
+VAULT_CONTAINER="vaultwarden"
+VAULT_DB_PATH="$DOCKER_PATH/vaultwarden/data/db.sqlite3"
+FILE="$BACKUPDIR/vaultwarden-sqlite-$TIMESTAMP.sql.gz"
+
+if docker ps --format '{{.Names}}' | grep -q "$VAULT_CONTAINER" && docker exec "$VAULT_CONTAINER" which sqlite3 >/dev/null 2>&1; then
+    # dump z kontenera
+    docker exec "$VAULT_CONTAINER" sqlite3 "/data/db.sqlite3" .dump | gzip > "$FILE"
     DB_COUNT=$((DB_COUNT+1))
-
-    SQLITE_PATH=$(docker exec "$i" bash -c 'echo data/db.sqlite3 2>/dev/null')
-    FILE="$BACKUPDIR/$i-sqlite-$TIMESTAMP.sql.gz"
-
-    docker exec "$i" sqlite3 "$SQLITE_PATH" .dump | gzip > "$FILE"
-    echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
-done < <(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'vaultwarden' | cut -d":" -f1)
-
-# ------------------------
-# Nginx Proxy Manager SQLite Backup
-# ------------------------
-while read -r i; do
-    [ -z "$i" ] && continue
+    echo "[$TIMESTAMP] $FILE — dumped from container, size: $(du -h "$FILE" | awk '{print $1}')"
+elif [ -f "$VAULT_DB_PATH" ]; then
+    # fallback: dump z hosta
+    sqlite3 "$VAULT_DB_PATH" .dump | gzip > "$FILE"
     DB_COUNT=$((DB_COUNT+1))
+    echo "[$TIMESTAMP] $FILE — dumped from host, size: $(du -h "$FILE" | awk '{print $1}')"
+else
+    echo "[$TIMESTAMP] ❌ Cannot backup Vaultwarden: sqlite3 not found in container and host file missing"
+fi
 
-    SQLITE_PATH="/data/database.sqlite"
-    FILE="$BACKUPDIR/$i-sqlite-$TIMESTAMP.sql.gz"
+# --- Nginx Proxy Manager ---
+NPM_CONTAINER="nginx"
+NPM_DB_PATH="$DOCKER_PATH/nginx/data/database.sqlite"
+FILE="$BACKUPDIR/nginx-sqlite-$TIMESTAMP.sql.gz"
 
-    docker exec "$i" sqlite3 "$SQLITE_PATH" .dump | gzip > "$FILE"
-    echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
-done < <(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'nginx' | cut -d":" -f1)
+if docker ps --format '{{.Names}}' | grep -q "$NPM_CONTAINER" && docker exec "$NPM_CONTAINER" which sqlite3 >/dev/null 2>&1; then
+    docker exec "$NPM_CONTAINER" sqlite3 "/data/database.sqlite" .dump | gzip > "$FILE"
+    DB_COUNT=$((DB_COUNT+1))
+    echo "[$TIMESTAMP] $FILE — dumped from container, size: $(du -h "$FILE" | awk '{print $1}')"
+elif [ -f "$NPM_DB_PATH" ]; then
+    sqlite3 "$NPM_DB_PATH" .dump | gzip > "$FILE"
+    DB_COUNT=$((DB_COUNT+1))
+    echo "[$TIMESTAMP] $FILE — dumped from host, size: $(du -h "$FILE" | awk '{print $1}')"
+else
+    echo "[$TIMESTAMP] ❌ Cannot backup Nginx Proxy Manager: sqlite3 not found in container and host file missing"
+fi
+
+
 
 
 # ------------------------
