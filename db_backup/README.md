@@ -4,19 +4,14 @@ A simple and reliable Docker database backup script supporting `MySQL/MariaDB`, 
 
 ## Features
 
-Backups live Docker container databases without stopping them.
-
-Supports `gzip` compression.
-
-Automatically rotates logs to prevent oversized log files.
-
-Cleans up old backups, keeping:
-
-- Last 7 daily backups
-- 1 backup from the last week
-- 1 backup from the last month
-
-Logs progress and sizes for each backup.
+- Backups live Docker container databases without stopping them.
+- Automatically checks if the required dump tool (mysqldump, pg_dump, sqlite3) exists inside the container.
+- Supports `gzip` compression.
+- Logs progress and sizes for each backup. Automatically rotates logs to prevent oversized log files.
+- Cleans up old backups, keeping:
+    - Last 7 daily backups
+    - 1 backup from the last week
+    - 1 backup from the last month
 
 ## Requirements 
 
