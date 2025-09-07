@@ -121,7 +121,7 @@ for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep 'postgres' | cut -d
 
     # 
     if docker exec "$i" which pg_dump >/dev/null 2>&1; then
-        docker exec -e PGPASSWORD="$PG_PASS" "$i" pg_dump -U "$PG_USER" -d "$PG_DB" | gzip > "$FILE"
+        docker exec -e PGPASSWORD="$PG_PASS" "$i" pg_dump -U "$PG_USER" -d "$PG_DB" -Fc | gzip > "$FILE"
         echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
     else
         echo "[$TIMESTAMP] ❌ Cannot backup $i/$PG_DB: pg_dump not found in container"
