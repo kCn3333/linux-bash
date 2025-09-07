@@ -164,7 +164,7 @@ done
 # ------------------------
 # SQLite Backup (host paths or container)
 # ------------------------
-DOCKER_PATH="/home/$CURRENT_USER/docker/"
+DOCKER_PATH="/home/$CURRENT_USER/docker/"           # change to your own path 
 
 # --- Vaultwarden ---
 VAULT_CONTAINER="vaultwarden"
