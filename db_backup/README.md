@@ -5,7 +5,7 @@ A simple and reliable Docker database backup script supporting `MySQL/MariaDB`, 
 ## Features
 
 - Backups live Docker container databases without stopping them.
-- Automatically checks if the required dump tool (mysqldump, pg_dump, sqlite3) exists inside the container.
+- Automatically checks if the required dump tool (`mysqldump`, `pg_dump`, `sqlite3`) exists inside the container.
 - Supports `gzip` compression.
 - Logs progress and sizes for each backup. Automatically rotates logs to prevent oversized log files.
 - Cleans up old backups, keeping:
@@ -37,14 +37,14 @@ cat ~/db_backups/logs/db_backup.log
 
 ### Adding to Cron
 
-To run the backup automatically (e.g., daily at 2:20 AM):
+To run the backup automatically:
 
 Open the crontab for your user:
 ```
 crontab -e
 ```
 
-Add the following line:
+Add the following line, for daily at 2:20 AM:
 ```
 20 2 * * * /home/user/path-to-dir/db_backup.sh
 ```
