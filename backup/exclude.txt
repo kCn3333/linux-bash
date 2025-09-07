@@ -1,0 +1,5 @@
+.cache/
+.tmp/
+.snap/
+.Trash*/
+.local/share/Trash/
