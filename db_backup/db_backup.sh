@@ -96,31 +96,30 @@ for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mariadb|mysql' 
 
     # Nextcloud handled separately
     if [[ "$i" == *nextcloud* ]]; then
-        echo "[$TIMESTAMP] Skipping backup for $i (Nextcloud handled separately)"
-        continue
+        MYSQL_PWD=$(docker exec nextcloud-app-1 sh -c "grep -Po \"'dbpassword'\\s*=>\\s*'\\K[^']+\" /var/www/html/config/config.php")
+    else
+        MYSQL_PWD=$(docker exec "$i" env | grep MYSQL_PASSWORD | cut -d"=" -f2)
     fi
 
     DB_COUNT=$((DB_COUNT+1))
 
     MYSQL_USER=$(docker exec "$i" env | grep MYSQL_USER | cut -d"=" -f2)
     MYSQL_DB=$(docker exec "$i" env | grep MYSQL_DATABASE | cut -d"=" -f2)
-    MYSQL_PWD=$(docker exec "$i" env | grep MYSQL_PASSWORD | cut -d"=" -f2)
-
     MYSQL_USER=${MYSQL_USER:-root}
     MYSQL_DB=${MYSQL_DB:-"$MYSQL_USER"}
-
-    MYSQL_PORT=$(docker inspect -f '{{ (index .NetworkSettings.Ports "3306/tcp") }}' "$i" 2>/dev/null | grep -oP '[0-9]+')
-    MYSQL_HOST="127.0.0.1"
 
     FILE="$BACKUPDIR/$i-mysql-$MYSQL_DB-$TIMESTAMP.sql.gz"
 
     # 1️⃣ Dump from container
     if docker exec "$i" which mysqldump >/dev/null 2>&1; then
         docker exec "$i" mysqldump -u "$MYSQL_USER" -p"$MYSQL_PWD" "$MYSQL_DB" | gzip > "$FILE"
-        echo "[$TIMESTAMP] $FILE — dumped from container"
+    elif docker exec "$i" which mariadb-dump >/dev/null 2>&1; then
+        docker exec "$i" mariadb-dump -u "$MYSQL_USER" -p"$MYSQL_PWD" "$MYSQL_DB" | gzip > "$FILE"
 
     # 2️⃣ Fallback host TCP (port 3306)
     elif [ -n "$MYSQL_PORT" ]; then
+        MYSQL_PORT=$(docker inspect -f '{{ (index .NetworkSettings.Ports "3306/tcp") }}' "$i" 2>/dev/null | grep -oP '[0-9]+')
+        MYSQL_HOST="127.0.0.1"
         echo "[$TIMESTAMP] mysqldump not found in container, using host TCP connection"
         mysqldump -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" -p"$MYSQL_PWD" "$MYSQL_DB" | gzip > "$FILE"
     else
@@ -129,6 +128,7 @@ for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mariadb|mysql' 
 
     [ -f "$FILE" ] && echo "[$TIMESTAMP] $FILE — done, size: $(du -h "$FILE" | awk '{print $1}')"
 done
+
 
 # ------------------------
 # PostgreSQL Backup
@@ -172,12 +172,12 @@ VAULT_DB_PATH="$DOCKER_PATH/vaultwarden/data/db.sqlite3"
 FILE="$BACKUPDIR/vaultwarden-sqlite-$TIMESTAMP.sql.gz"
 
 if docker ps --format '{{.Names}}' | grep -q "$VAULT_CONTAINER" && docker exec "$VAULT_CONTAINER" which sqlite3 >/dev/null 2>&1; then
-    # dump z kontenera
+     # 1️⃣ dump from container
     docker exec "$VAULT_CONTAINER" sqlite3 "/data/db.sqlite3" .dump | gzip > "$FILE"
     DB_COUNT=$((DB_COUNT+1))
     echo "[$TIMESTAMP] $FILE — dumped from container, size: $(du -h "$FILE" | awk '{print $1}')"
 elif [ -f "$VAULT_DB_PATH" ]; then
-    # fallback: dump z hosta
+    # 2️⃣ fallback: dump from host
     sqlite3 "$VAULT_DB_PATH" .dump | gzip > "$FILE"
     DB_COUNT=$((DB_COUNT+1))
     echo "[$TIMESTAMP] $FILE — dumped from host, size: $(du -h "$FILE" | awk '{print $1}')"
@@ -191,10 +191,12 @@ NPM_DB_PATH="$DOCKER_PATH/nginx/data/database.sqlite"
 FILE="$BACKUPDIR/nginx-sqlite-$TIMESTAMP.sql.gz"
 
 if docker ps --format '{{.Names}}' | grep -q "$NPM_CONTAINER" && docker exec "$NPM_CONTAINER" which sqlite3 >/dev/null 2>&1; then
+    # 1️⃣ dump from container
     docker exec "$NPM_CONTAINER" sqlite3 "/data/database.sqlite" .dump | gzip > "$FILE"
     DB_COUNT=$((DB_COUNT+1))
     echo "[$TIMESTAMP] $FILE — dumped from container, size: $(du -h "$FILE" | awk '{print $1}')"
 elif [ -f "$NPM_DB_PATH" ]; then
+    # 2️⃣ fallback: dump from host
     sqlite3 "$NPM_DB_PATH" .dump | gzip > "$FILE"
     DB_COUNT=$((DB_COUNT+1))
     echo "[$TIMESTAMP] $FILE — dumped from host, size: $(du -h "$FILE" | awk '{print $1}')"
