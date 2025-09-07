@@ -75,10 +75,17 @@ while read -r i; do
 done < <(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mongo' | cut -d":" -f1 || true)
 
 # ------------------------
-# MySQL/MariaDB Backup (host fallback)
+# MySQL/MariaDB Backup (host fallback, excluding Nextcloud)
 # ------------------------
 for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mariadb|mysql' | cut -d":" -f1); do
     [ -z "$i" ] && continue
+
+    # Nextcloud handled separately
+    if [[ "$i" == *nextcloud* ]]; then
+        echo "[$TIMESTAMP] Skipping backup for $i (Nextcloud handled separately)"
+        continue
+    fi
+
     DB_COUNT=$((DB_COUNT+1))
 
     MYSQL_USER=$(docker exec "$i" env | grep MYSQL_USER | cut -d"=" -f2)
