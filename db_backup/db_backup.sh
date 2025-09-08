@@ -96,7 +96,7 @@ for i in $(docker ps --format '{{.Names}}:{{.Image}}' | grep -E 'mariadb|mysql' 
 
     # Nextcloud handled separately
     if [[ "$i" == *nextcloud* ]]; then
-        MYSQL_PWD=$(docker exec nextcloud-app-1 sh -c "grep -Po \"'dbpassword'\\s*=>\\s*'\\K[^']+\" /var/www/html/config/config.php")
+        MYSQL_PWD=$(docker exec -u www-data nextcloud-app-1 php -f /var/www/html/occ config:system:get dbpassword -n)
     else
         MYSQL_PWD=$(docker exec "$i" env | grep MYSQL_PASSWORD | cut -d"=" -f2)
     fi
