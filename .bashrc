@@ -65,6 +65,14 @@ alias df='df -h'
 alias du='du -h'
 alias free='free -h'
 alias mkdir='mkdir -p'
+alias ~='cd ~'            
+alias .='pwd'  
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias .....='cd ../../../..'
+alias ......='cd ../../../../..'
+
 
 # ─────────────────────────────────────
 # completion
