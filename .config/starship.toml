@@ -1,0 +1,97 @@
+add_newline = false
+command_timeout = 1000
+format = """$time $username$os$hostname$kubernetes$directory$git_branch$git_status"""
+
+palette = "custom"
+
+[palettes.custom]
+time_bg = "#2f2f38ff"
+time_fg = "#6e738d"
+user_color = "#cad3f5"
+host_color = "#cad3f5"
+dir_color = "#89b4fa"
+git_color = "#5fa37a"
+k8s_color = "#3f7fa6"
+
+[character]
+success_symbol = ''
+error_symbol = ''
+
+[os]
+format = '[$symbol](bold white) '
+disabled = false
+
+[os.symbols]
+Windows = ''
+Arch = '󰣇'
+Ubuntu = ''
+Macos = '󰀵'
+Debian = ""
+
+[time]
+disabled = false
+time_format = "%H:%M:%S"
+format = '[[\[$time\]](fg:time_fg bg:time_bg)]($style)'
+
+[username]
+style_user = 'user_color bold'
+style_root = 'red bold'
+format = '[$user]($style) '
+disabled = false
+show_always = true
+
+[hostname]
+ssh_only = false
+style = 'host_color'
+format = '[$hostname]($style) '
+disabled = false
+
+[directory]
+truncation_length = 3
+truncation_symbol = '…/'
+home_symbol = '󰋜 ~'
+read_only_style = '#ee99a0'
+read_only = '  '
+style = 'dir_color'
+format = 'at [$path]($style)[$read_only]($read_only_style) '
+
+[git_branch]
+symbol = ' '
+style = 'git_color bold'
+format = 'via [$symbol$branch]($style) '
+
+[git_status]
+style = 'git_color bold'
+format = '[$all_status$ahead_behind]($style) '
+conflicted = '🏳'
+up_to_date = ''
+untracked = ' '
+ahead = '⇡${count}'
+diverged = '⇕⇡${ahead_count}⇣${behind_count}'
+behind = '⇣${count}'
+stashed = ' '
+modified = ' '
+staged = '[++\($count\)](git_color)'
+renamed = '襁 '
+deleted = ' '
+
+[kubernetes]
+style = 'k8s_color bold'
+format = 'via [󱃾 $context\($namespace\)]($style) '
+disabled = false
+
+# --- DISABLED ---
+[vagrant]
+disabled = true
+[docker_context]
+disabled = true
+[helm]
+disabled = true
+[python]
+disabled = true
+[nodejs]
+disabled = true
+[ruby]
+disabled = true
+[terraform]
+disabled = true
